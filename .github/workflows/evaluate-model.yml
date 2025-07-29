@@ -1,4 +1,4 @@
-name: Evaluate Model PR
+name: OllamaForge Model Evaluation
 
 on:
   pull_request:

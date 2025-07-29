@@ -1,7 +1,7 @@
 # Task Name
 
 ## Overview
-Brief description of what this specialized LLM does and its primary use case.
+Brief description of what this specialized OllamaForge model does and its primary use case.
 
 ## Model Details
 - Base Model: [e.g., Gemma, Llama, etc.]

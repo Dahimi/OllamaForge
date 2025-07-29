@@ -1,11 +1,11 @@
 
 
-# **Nexus LLM Hub: Open-Source Platform for Specialized Language Models**
+# **OllamaForge: Crafting Specialized Language Models**
 
 ## **Overview**
-Nexus LLM Hub is an open-source platform for developing, sharing, and evaluating specialized language models using Ollama. Instead of building general-purpose LLMs, we focus on creating highly specialized models for specific domains and tasks - from medical assessment to technical documentation.
+OllamaForge is an open-source platform for developing, sharing, and evaluating specialized language models using Ollama. Instead of building general-purpose LLMs, we focus on creating highly specialized models for specific domains and tasks - from medical assessment to technical documentation.
 
-Our mission is to foster a community of specialized LLMs where each model excels at a specific task, making AI more efficient and accessible. Each successful model is automatically published to the Ollama Hub, making it instantly available to users worldwide.
+Our mission is to forge the future of specialized LLMs where each model excels at a specific task, making AI more efficient and accessible. Each successful model is automatically published to the Ollama Hub, making it instantly available to users worldwide.
 
 ## **How It Works**
 
@@ -30,7 +30,7 @@ graph TD
 ```
 
 ## **Available Tasks**
-Each task in Nexus LLM Hub is self-contained with its own:
+Each task in OllamaForge is self-contained with its own:
 - Model definition (Modelfile)
 - Benchmark dataset
 - Evaluation metrics
@@ -42,7 +42,7 @@ Current tasks:
 
 ## **Project Structure**
 ```
-nexus-llm-hub/
+ollamaforge/
 ├── tasks/                  # Each specialized task
 │   └── child_trauma_assessment/
 │       ├── model/         # Ollama model definition
@@ -84,8 +84,8 @@ Your PR must demonstrate:
 
 2. Clone the repository:
    ```bash
-   git clone https://github.com/Dahimi/Nexus-LLM-Hub.git
-   cd Nexus-LLM-Hub
+   git clone https://github.com/Dahimi/OllamaForge.git
+   cd OllamaForge
    ```
 
 3. Create and activate a virtual environment:
@@ -123,7 +123,8 @@ Your PR must demonstrate:
    - Usage analytics
    - Collaborative improvement tools
 
-## **Meet Our Team (Only me now)**
+## **Meet Our Team**
+- [Yassmine ED-DYB](https://www.linkedin.com/in/yassmineeddyb/)
 - [Soufiane DAHIMI](https://www.linkedin.com/in/soufiane-dahimi/)
 
 ## **License**

@@ -1,7 +1,7 @@
-# Contributing to Nexus LLM Hub
+# Contributing to OllamaForge
 
 ## Vision
-We're building the world's first competitive hub for specialized LLMs. Think of it as an Olympic Games for AI models - where each task is a different sport, and models compete to be the fastest, most accurate, or most efficient.
+We're building the world's first competitive hub for specialized LLMs, forged with Ollama. Think of it as an Olympic Games for AI models - where each task is a different sport, and models compete to be the fastest, most accurate, or most efficient.
 
 ## Important Rules 📜
 
