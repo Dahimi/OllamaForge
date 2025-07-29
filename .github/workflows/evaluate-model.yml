@@ -74,6 +74,8 @@ jobs:
         echo "MODEL_NAME=$MODEL_NAME" >> $GITHUB_ENV
         
     - name: Run evaluation
+      env:
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       run: |
         python scripts/evaluate_task.py "${{ needs.check-single-task.outputs.task_path }}" "$MODEL_NAME"
 
