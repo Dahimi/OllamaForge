@@ -1,0 +1,18 @@
+# Core dependencies
+ollama
+psutil
+pydantic
+
+# LLM APIs
+langchain-groq
+langchain-together
+langchain-mistralai
+httpx==0.27.2
+
+# Testing and evaluation
+pytest
+pytest-asyncio
+
+# Utilities
+python-dotenv
+tqdm

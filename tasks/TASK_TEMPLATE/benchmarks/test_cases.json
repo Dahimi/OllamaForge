@@ -1,0 +1,34 @@
+{
+  "test_cases": [
+    {
+      "id": "test_case_001",
+      "description": "Description of what this test case evaluates",
+      "conversation": [
+        {
+          "role": "user",
+          "content": "Example user input"
+        }
+      ],
+      "expected_output": "Example expected model output"
+    },
+    {
+      "id": "test_case_002",
+      "description": "Another test case description",
+      "conversation": [
+        {
+          "role": "user",
+          "content": "First user message"
+        },
+        {
+          "role": "assistant",
+          "content": "First assistant response"
+        },
+        {
+          "role": "user",
+          "content": "Follow-up user message"
+        }
+      ],
+      "expected_output": "Expected model output for the follow-up"
+    }
+  ]
+} 

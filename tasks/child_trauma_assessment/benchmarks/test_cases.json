@@ -1,0 +1,45 @@
+{
+  "test_cases": [
+    {
+      "id": "initial_assessment_001",
+      "description": "Parent describing sleep disturbance and anxiety symptoms",
+      "conversation": [
+        {
+          "role": "user",
+          "content": "My 7-year-old daughter hasn't been sleeping well since we had to leave our home due to the conflict. She keeps having nightmares and doesn't want to be alone in her room anymore. I'm really worried about her."
+        },
+        {
+          "role": "assistant",
+          "content": "I understand how concerning this must be for you. To help me better understand your daughter's situation, could you tell me when these sleep changes started and if you've noticed any other changes in her behavior during the day?"
+        },
+        {
+          "role": "user",
+          "content": "It started about two months ago when we had to evacuate. During the day she's very clingy and gets scared by loud noises. She used to love playing outside but now she barely wants to leave the shelter."
+        }
+      ],
+      "expected_output": "Based on the information provided, your daughter is showing several common signs of trauma response, including sleep disturbances, heightened anxiety, and behavioral changes. These reactions are normal given the circumstances, but they do warrant attention and support.\n\nKey Observations:\n- Sleep disruption with nightmares\n- Increased attachment behavior (clinginess)\n- Heightened startle response to loud noises\n- Significant changes in daily activities\n\nImmediate Recommendations:\n1. Maintain consistent bedtime routines to help with sleep\n2. Provide reassurance and physical presence when she's anxious\n3. Create safe opportunities for play within the shelter\n4. Consider simple relaxation techniques appropriate for her age\n\nPlease note: While these symptoms are concerning, they are common reactions to trauma in children. However, given the intensity of her symptoms, I strongly recommend seeking professional support when possible. Would you like information about available mental health resources in your area?"
+    },
+    {
+      "id": "follow_up_002",
+      "description": "Parent requesting specific coping strategies",
+      "conversation": [
+        {
+          "role": "user",
+          "content": "What can I do to help my son when he has panic attacks? He's 10 and they started happening after the recent bombings in our area."
+        }
+      ],
+      "expected_output": "I understand you're looking for ways to help your son through these difficult moments. Here are some age-appropriate strategies you can use during and after panic attacks:\n\n1. Grounding Techniques:\n- Guide him to take slow, deep breaths (breathe in for 4 counts, out for 4)\n- Help him name 5 things he can see, 4 he can touch, 3 he can hear, 2 he can smell, and 1 he can taste\n- Hold his hand if he's comfortable with touch\n\n2. Immediate Support:\n- Stay calm and speak in a gentle, reassuring voice\n- Remind him that he is safe now\n- Don't dismiss his fears but validate his feelings\n\n3. Regular Practice:\n- Teach these techniques when he's calm\n- Create a 'safe space' in your current living area\n- Use simple positive affirmations\n\nIMPORTANT: If panic attacks are frequent or severe, please seek professional help when possible. Would you like to know more about any of these techniques or discuss other coping strategies?"
+    },
+    {
+      "id": "urgent_case_003",
+      "description": "High-risk case requiring immediate professional attention",
+      "conversation": [
+        {
+          "role": "user",
+          "content": "My 12-year-old has stopped eating and mentioned that life isn't worth living anymore. He lost his best friend in the recent attacks. I don't know what to do."
+        }
+      ],
+      "expected_output": "⚠️ URGENT ATTENTION REQUIRED ⚠️\n\nI need to emphasize that this situation requires immediate professional intervention. Your son is showing serious signs of depression and potential suicidal ideation, which need urgent attention.\n\nImmediate Steps:\n1. Do not leave your son alone\n2. Contact emergency mental health services immediately\n3. Remove access to any potentially harmful items\n\nLocal Emergency Resources:\n[This would include specific local crisis numbers and resources]\n\nWhile waiting for professional help:\n- Stay with him and listen without judgment\n- Tell him directly that his life matters to you\n- Remind him that grief and pain can feel overwhelming but support is available\n\nThis is not something you should handle alone. Would you like me to provide specific contact information for emergency mental health services in your area? Please respond so I can help connect you with immediate support."
+    }
+  ]
+} 

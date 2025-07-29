@@ -1,0 +1,102 @@
+name: Evaluate Trauma Assessment Model
+
+on:
+  pull_request:
+    paths:
+      - 'tasks/child_trauma_assessment/**'
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements/requirements.txt
+        pip install psutil ollama
+        
+    - name: Install Ollama
+      run: |
+        curl -fsSL https://ollama.com/install.sh | sh
+        
+    - name: Start Ollama server
+      run: |
+        ollama serve &
+        sleep 5  # Wait for server to start
+        
+    - name: Create model from PR
+      run: |
+        MODEL_NAME="trauma-assessment-pr-${{ github.event.pull_request.number }}"
+        ollama create $MODEL_NAME -f tasks/child_trauma_assessment/model/Modelfile
+        
+    - name: Run evaluation
+      run: |
+        python - <<EOF
+        import json
+        import sys
+        from tasks.child_trauma_assessment.evaluation.metrics.response_quality import evaluate_response_quality
+        from tasks.child_trauma_assessment.evaluation.metrics.performance import measure_performance, format_performance_report
+
+        # Load benchmark cases
+        with open('tasks/child_trauma_assessment/benchmarks/test_cases.json', 'r') as f:
+            test_cases = json.load(f)['test_cases']
+
+        model_name = "trauma-assessment-pr-${{ github.event.pull_request.number }}"
+        quality_scores = []
+        performance_metrics = []
+
+        # Run evaluation for each test case
+        for case in test_cases:
+            # Measure performance
+            perf_metrics = measure_performance(
+                model_name=model_name,
+                messages=case['conversation']
+            )
+            performance_metrics.append(perf_metrics)
+            
+            # Get model response (non-streaming for quality evaluation)
+            response = chat(
+                model=model_name,
+                messages=case['conversation'],
+                stream=False
+            )
+            
+            # Evaluate quality
+            quality_metric = evaluate_response_quality(
+                conversation_history=case['conversation'],
+                model_response=response.message.content,
+                expected_output=case['expected_output']
+            )
+            quality_scores.append(quality_metric)
+
+        # Calculate average scores
+        avg_quality = sum(score.score for score in quality_scores) / len(quality_scores)
+        avg_ttft = sum(p.latency.time_to_first_token for p in performance_metrics) / len(performance_metrics)
+        avg_token_latency = sum(p.latency.avg_inter_token_latency for p in performance_metrics) / len(performance_metrics)
+        avg_memory = sum(p.memory.avg_memory_mb for p in performance_metrics) / len(performance_metrics)
+
+        # Print results
+        print("\nEvaluation Results:")
+        print(f"Average Quality Score: {avg_quality:.3f}")
+        print(f"Average Time to First Token: {avg_ttft:.3f}s")
+        print(f"Average Inter-token Latency: {avg_token_latency:.3f}s")
+        print(f"Average Memory Usage: {avg_memory:.2f}MB")
+
+        # Set exit code based on quality threshold
+        QUALITY_THRESHOLD = 0.8
+        sys.exit(0 if avg_quality >= QUALITY_THRESHOLD else 1)
+        EOF
+
+    - name: Clean up
+      if: always()
+      run: |
+        pkill ollama || true
+        ollama rm "trauma-assessment-pr-${{ github.event.pull_request.number }}" || true 

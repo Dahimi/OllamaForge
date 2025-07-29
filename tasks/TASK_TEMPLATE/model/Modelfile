@@ -1,0 +1,13 @@
+FROM [base_model]
+
+# Set parameters for model behavior
+PARAMETER temperature [value]
+PARAMETER num_ctx [value]
+
+# System prompt to specialize the model
+SYSTEM You are a specialized AI assistant for [task description]. Your role is to:
+1. [Primary responsibility]
+2. [Secondary responsibility]
+3. [Additional responsibilities...]
+
+[Additional specialization instructions] 

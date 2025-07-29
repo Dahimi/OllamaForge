@@ -1,0 +1,90 @@
+name: Evaluate Model PR
+
+on:
+  pull_request:
+    paths:
+      - 'tasks/**'
+
+jobs:
+  check-single-task:
+    runs-on: ubuntu-latest
+    outputs:
+      task_path: ${{ steps.get-task.outputs.task_path }}
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0  # Needed for git diff
+        
+    - name: Get changed task
+      id: get-task
+      run: |
+        # Get all changed files in tasks/ directory
+        CHANGED_TASKS=$(git diff --name-only origin/${{ github.base_ref }} ${{ github.sha }} | grep '^tasks/' || true)
+        
+        # Extract unique task paths (first directory under tasks/)
+        UNIQUE_TASKS=$(echo "$CHANGED_TASKS" | awk -F'/' '{print $2}' | sort -u)
+        TASK_COUNT=$(echo "$UNIQUE_TASKS" | grep -v '^$' | wc -l)
+        
+        if [ "$TASK_COUNT" -eq 0 ]; then
+          echo "No task changes detected"
+          exit 1
+        elif [ "$TASK_COUNT" -gt 1 ]; then
+          echo "Error: Changes detected in multiple tasks. Please submit separate PRs for each task."
+          echo "Changed tasks:"
+          echo "$UNIQUE_TASKS"
+          exit 1
+        fi
+        
+        TASK_PATH="tasks/$UNIQUE_TASKS"
+        echo "task_path=$TASK_PATH" >> $GITHUB_OUTPUT
+        echo "Detected task: $TASK_PATH"
+
+  evaluate:
+    needs: check-single-task
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements/requirements.txt
+        pip install psutil ollama
+        
+    - name: Install Ollama
+      run: |
+        curl -fsSL https://ollama.com/install.sh | sh
+        
+    - name: Start Ollama server
+      run: |
+        ollama serve &
+        sleep 5  # Wait for server to start
+        
+    - name: Create model from PR
+      run: |
+        MODEL_NAME="${{ needs.check-single-task.outputs.task_path }}-pr-${{ github.event.pull_request.number }}"
+        MODEL_NAME=${MODEL_NAME//\//-}  # Replace / with - in model name
+        ollama create $MODEL_NAME -f ${{ needs.check-single-task.outputs.task_path }}/model/Modelfile
+        echo "MODEL_NAME=$MODEL_NAME" >> $GITHUB_ENV
+        
+    - name: Run evaluation
+      run: |
+        python scripts/evaluate_task.py "${{ needs.check-single-task.outputs.task_path }}" "$MODEL_NAME"
+
+    - name: Push to Ollama Hub
+      if: success()
+      run: |
+        # TODO: Add Ollama Hub push logic here
+        echo "Model $MODEL_NAME would be pushed to Ollama Hub"
+        
+    - name: Clean up
+      if: always()
+      run: |
+        pkill ollama || true
+        ollama rm "$MODEL_NAME" || true 
