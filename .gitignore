@@ -34,3 +34,7 @@ ENV/
 # Misc
 .DS_Store
 .venv
+
+
+# env
+.env

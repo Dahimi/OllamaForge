@@ -1,9 +1,8 @@
 import time
-import psutil
-import statistics
 from typing import Dict, List, Optional
 from dataclasses import dataclass
-from ollama import chat
+from ollama import chat, ps
+from datetime import datetime
 
 
 @dataclass
@@ -16,9 +15,9 @@ class LatencyMetrics:
     
 @dataclass
 class MemoryMetrics:
-    peak_memory_mb: float
-    avg_memory_mb: float
-    memory_samples: List[float]
+    size_bytes: int  # Total model size in bytes
+    vram_bytes: int  # VRAM usage in bytes
+    details: Dict    # Additional model details
 
 
 @dataclass
@@ -27,20 +26,37 @@ class PerformanceMetrics:
     memory: MemoryMetrics
 
 
-def measure_performance(model_name: str, messages: List[Dict], sample_interval: float = 0.1) -> PerformanceMetrics:
+def get_model_memory_stats(model_name: str) -> MemoryMetrics:
+    """
+    Get memory statistics for a specific model using ollama.ps()
+    """
+    processes = ps()
+    for model in processes.models:
+        if model_name in model.name:
+            return MemoryMetrics(
+                size_bytes=model.size,
+                vram_bytes=model.size_vram,
+                details={
+                    "format": model.details.format,
+                    "family": model.details.family,
+                    "parameter_size": model.details.parameter_size,
+                    "quantization": model.details.quantization_level
+                }
+            )
+    raise ValueError(f"Model {model_name} not found in running processes")
+
+
+def measure_performance(model_name: str, messages: List[Dict]) -> PerformanceMetrics:
     """
     Measures performance metrics while running model inference.
     
     Args:
         model_name: Name of the Ollama model
         messages: List of conversation messages
-        sample_interval: Interval for memory sampling in seconds
     
     Returns:
         PerformanceMetrics containing latency and memory measurements
     """
-    process = psutil.Process()
-    memory_samples = []
     inter_token_times = []
     last_token_time = None
     
@@ -60,10 +76,6 @@ def measure_performance(model_name: str, messages: List[Dict], sample_interval: 
     for chunk in stream:
         current_time = time.time()
         
-        # Memory sampling
-        memory_mb = process.memory_info().rss / 1024 / 1024
-        memory_samples.append(memory_mb)
-        
         # First token timing
         if not first_token_received:
             time_to_first_token = current_time - start_time
@@ -73,23 +85,17 @@ def measure_performance(model_name: str, messages: List[Dict], sample_interval: 
         if last_token_time is not None:
             inter_token_times.append(current_time - last_token_time)
         last_token_time = current_time
-        
-        time.sleep(sample_interval)  # Allow time for memory sampling
     
     total_time = time.time() - start_time
     
-    # Calculate memory metrics
-    memory_metrics = MemoryMetrics(
-        peak_memory_mb=max(memory_samples),
-        avg_memory_mb=statistics.mean(memory_samples),
-        memory_samples=memory_samples
-    )
+    # Get memory metrics
+    memory_metrics = get_model_memory_stats(model_name)
     
     # Calculate latency metrics
     latency_metrics = LatencyMetrics(
         time_to_first_token=time_to_first_token,
         inter_token_latencies=inter_token_times,
-        avg_inter_token_latency=statistics.mean(inter_token_times) if inter_token_times else 0,
+        avg_inter_token_latency=sum(inter_token_times) / len(inter_token_times) if inter_token_times else 0,
         total_response_time=total_time
     )
     
@@ -113,7 +119,14 @@ Total Response Time: {metrics.latency.total_response_time:.3f}s
 
 Memory Usage:
 ------------
-Peak Memory: {metrics.latency.peak_memory_mb:.2f}MB
-Average Memory: {metrics.latency.avg_memory_mb:.2f}MB
+Model Size: {metrics.memory.size_bytes / (1024*1024*1024):.2f}GB
+VRAM Usage: {metrics.memory.vram_bytes / (1024*1024*1024):.2f}GB
+
+Model Details:
+-------------
+Format: {metrics.memory.details["format"]}
+Family: {metrics.memory.details["family"]}
+Parameter Size: {metrics.memory.details["parameter_size"]}
+Quantization: {metrics.memory.details["quantization"]}
 """
     return report 

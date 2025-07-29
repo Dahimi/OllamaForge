@@ -1,6 +1,9 @@
 from typing import Dict, List
 from pydantic import BaseModel, Field
-from agent_hub.llms import groq_llm
+from langchain_groq import ChatGroq
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class ResponseQualityMetric(BaseModel):
@@ -15,7 +18,7 @@ class ResponseQualityMetric(BaseModel):
         default_factory=list
     )
 
-
+groq_llm = ChatGroq(model="llama-3.3-70b-versatile")
 llm = groq_llm.with_structured_output(ResponseQualityMetric)
 
 
@@ -62,3 +65,13 @@ Provide:
 Focus particularly on clinical safety and appropriateness of the response."""
 
     return llm.invoke(prompt) 
+
+
+if __name__ == "__main__":
+    conversation_history = [
+        {"role": "user", "content": "Hello, how are you?"},
+        {"role": "assistant", "content": "I'm doing well, thank you!"},
+    ]
+    model_response = "I'm doing well, thank you!"
+    expected_output = "I'm doing well, thank you!"
+    print(evaluate_response_quality(conversation_history, model_response, expected_output))
