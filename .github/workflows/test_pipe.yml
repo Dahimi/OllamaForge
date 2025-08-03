@@ -7,107 +7,57 @@ jobs:
   debug-push:
     runs-on: ubuntu-latest
     steps:
-    - name: Network debugging
-      run: |
-        echo "DNS Resolution:"
-        nslookup registry.ollama.com
-        
-        echo "\nPinging registry:"
-        ping -c 4 registry.ollama.com || true
-        
-        echo "\nTraceroute to registry:"
-        traceroute registry.ollama.com || true
-        
-        echo "\nCurl test (HTTP):"
-        curl -v https://ollama.com || true
-
-    - name: Set up SSH with alternative ports
-      run: |
-        # Create SSH config with multiple port attempts
-        mkdir -p ~/.ssh
-        cat > ~/.ssh/config << 'EOF'
-        Host registry.ollama.com
-          HostName registry.ollama.com
-          User git
-          IdentityFile ~/.ollama/id_ed25519
-          StrictHostKeyChecking no
-          Port 22
-          # Try alternative ports
-          Port 443
-          Port 2222
-        EOF
-        chmod 600 ~/.ssh/config
-        
-        # Set up Ollama keys
-        mkdir -p ~/.ollama
-        cat > ~/.ollama/id_ed25519.pub << 'EOF'
-        ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINUrNgtLrHYDcevxF8W/ZjE2GNbNelwQsAsQJuhyfgxN
-        EOF
-        
-        cat > ~/.ollama/id_ed25519 << 'EOF'
-        -----BEGIN OPENSSH PRIVATE KEY-----
-        b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtz
-        c2gtZWQyNTUxOQAAACDVKzYLS6x2A3Hr8RfFv2YxNhjWzXpcELALECbocn4MTQAA
-        AIgvWh8bL1ofGwAAAAtzc2gtZWQyNTUxOQAAACDVKzYLS6x2A3Hr8RfFv2YxNhjW
-        zXpcELALECbocn4MTQAAAEC5cwUIbXjLjlzj7md8KidpDNRvFJoPEnHdKZNTLmTu
-        sdUrNgtLrHYDcevxF8W/ZjE2GNbNelwQsAsQJuhyfgxNAAAAAAECAwQF
-        -----END OPENSSH PRIVATE KEY-----
-        EOF
-        
-        chmod 600 ~/.ollama/id_ed25519
-        chmod 644 ~/.ollama/id_ed25519.pub
-
-    - name: Test SSH connections
-      run: |
-        echo "Testing SSH connection on different ports:"
-        for port in 22 443 2222; do
-          echo "\nTrying port $port:"
-          ssh -vv -p $port registry.ollama.com -o ConnectTimeout=10 || true
-        done
-        
-        echo "\nTesting direct TCP connections:"
-        for port in 22 443 2222; do
-          echo "\nTrying netcat on port $port:"
-          nc -zv registry.ollama.com $port -w 5 || true
-        done
-
-    - name: Check Ollama documentation
-      run: |
-        echo "Fetching latest Ollama docs for registry info:"
-        curl -s https://ollama.com/api || true
-        
-        echo "\nChecking if registry.ollama.com resolves to alternative domains:"
-        host registry.ollama.com || true
-        dig registry.ollama.com || true
-
     - name: Install Ollama
       run: |
         curl -fsSL https://ollama.com/install.sh | sh
-        
-    - name: Try alternative push method
+
+    - name: Start Ollama server
       run: |
-        # Create a minimal model
+        # Kill any existing Ollama processes
+        pkill ollama || true
+        sleep 2
+        
+        # Start server with debug
+        OLLAMA_DEBUG=1 ollama serve &
+        sleep 5
+        
+        # Verify server
+        curl -v http://localhost:11434/api/tags
+
+    - name: Create and push test model
+      env:
+        OLLAMA_DEBUG: 1
+      run: |
+        # Create minimal model
         cat > Modelfile << 'EOF'
         FROM gemma:2b
         PARAMETER temperature 0.7
         EOF
         
-        # Try direct HTTPS push if available
-        echo "Checking for HTTPS push endpoint:"
-        curl -v https://registry.ollama.com/v1/models || true
+        # Create model with simpler name
+        ollama create test-debug -f Modelfile
         
-        # Create and attempt push with debug
-        ollama create test-model -f Modelfile
-        OLLAMA_DEBUG=1 OLLAMA_HOST=https://registry.ollama.com ollama push soufianedahimi/test-model:debug
+        # Push using the format that works locally
+        echo "Pushing model..."
+        ollama push llm_hub/test-debug
+        
+    - name: Debug info on failure
+      if: failure()
+      run: |
+        echo "Ollama logs:"
+        cat ~/.ollama/logs/ollama.log || true
+        
+        echo "\nProcess status:"
+        ps aux | grep ollama
+        
+        echo "\nNetwork connections:"
+        netstat -tupn | grep ollama || true
+        
+        echo "\nSSL/TLS debug:"
+        openssl s_client -connect registry.ollama.com:443 -debug || true
 
-    - name: Debug info
+    - name: Clean up
       if: always()
       run: |
-        echo "System info:"
-        uname -a
-        echo "\nNetwork interfaces:"
-        ip addr
-        echo "\nRouting table:"
-        netstat -rn
-        echo "\nFirewall rules:"
-        sudo iptables -L || true
+        pkill ollama || true
+        ollama rm test-debug || true
