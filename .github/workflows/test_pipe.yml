@@ -1,14 +1,58 @@
-name: Test Ollama Hub Push
+name: Debug Ollama Push
 
 on:
-  workflow_dispatch:  # Manual trigger for testing
+  workflow_dispatch:
 
 jobs:
-  test-push:
+  debug-push:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+    - name: Kill existing Ollama processes
+      run: |
+        if lsof -i:11434; then
+          echo "Port 11434 is in use. Killing processes..."
+          sudo lsof -i:11434 -t | xargs kill -9 || true
+        fi
+        sleep 2
+
+    - name: Set up SSH
+      run: |
+        # Create SSH config
+        mkdir -p ~/.ssh
+        cat > ~/.ssh/config << 'EOF'
+        Host registry.ollama.com
+          HostName registry.ollama.com
+          User git
+          IdentityFile ~/.ollama/id_ed25519
+          StrictHostKeyChecking no
+        EOF
+        chmod 600 ~/.ssh/config
+        
+        # Set up Ollama keys
+        mkdir -p ~/.ollama
+        cat > ~/.ollama/id_ed25519.pub << 'EOF'
+        ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINUrNgtLrHYDcevxF8W/ZjE2GNbNelwQsAsQJuhyfgxN
+        EOF
+        
+        cat > ~/.ollama/id_ed25519 << 'EOF'
+        -----BEGIN OPENSSH PRIVATE KEY-----
+        b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtz
+        c2gtZWQyNTUxOQAAACDVKzYLS6x2A3Hr8RfFv2YxNhjWzXpcELALECbocn4MTQAA
+        AIgvWh8bL1ofGwAAAAtzc2gtZWQyNTUxOQAAACDVKzYLS6x2A3Hr8RfFv2YxNhjW
+        zXpcELALECbocn4MTQAAAEC5cwUIbXjLjlzj7md8KidpDNRvFJoPEnHdKZNTLmTu
+        sdUrNgtLrHYDcevxF8W/ZjE2GNbNelwQsAsQJuhyfgxNAAAAAAECAwQF
+        -----END OPENSSH PRIVATE KEY-----
+        EOF
+        
+        chmod 600 ~/.ollama/id_ed25519
+        chmod 644 ~/.ollama/id_ed25519.pub
+        
+        echo "SSH and key setup complete. Verifying:"
+        ls -la ~/.ollama/
+        ls -la ~/.ssh/
+        
+        echo "Testing SSH connection to registry:"
+        ssh -vv registry.ollama.com
 
     - name: Install Ollama
       run: |
@@ -17,49 +61,37 @@ jobs:
     - name: Start Ollama server
       run: |
         ollama serve &
-        sleep 5  # Wait for server to start
-
-    - name: Debug SSH setup
-      run: |
-        echo "Public Key:"
-        echo "${{ secrets.OLLAMA_SSH_PUBLIC_KEY }}"
-        echo "Private Key (first few characters):"
-        echo "${{ secrets.OLLAMA_SSH_PRIVATE_KEY }}" | head -c 20
-        echo "Username:"
-        echo "${{ secrets.OLLAMA_USERNAME }}"
-
-    - name: Set up SSH for Ollama
-      run: |
-        mkdir -p ~/.ollama
-        echo "${{ secrets.OLLAMA_SSH_PRIVATE_KEY }}" > ~/.ollama/id_ed25519
-        chmod 600 ~/.ollama/id_ed25519
-        # Also save public key for debugging
-        echo "${{ secrets.OLLAMA_SSH_PUBLIC_KEY }}" > ~/.ollama/id_ed25519.pub
-        chmod 644 ~/.ollama/id_ed25519.pub
+        sleep 5
         
-        echo "SSH directory contents:"
-        ls -la ~/.ollama/
+        # Verify server is running
+        curl -v http://localhost:11434/api/tags
 
     - name: Create and push test model
-      env:
-        OLLAMA_USERNAME: ${{ secrets.OLLAMA_USERNAME }}
       run: |
-        # Create a simple test model
-        echo "FROM gemma:2b" > Modelfile
-        echo "PARAMETER temperature 0.7" >> Modelfile
+        # Create a minimal model
+        cat > Modelfile << 'EOF'
+        FROM gemma:2b
+        PARAMETER temperature 0.7
+        EOF
         
-        # Create local model
+        # Pull base model
+        ollama pull gemma:2b
+        
+        # Create and push
         ollama create test-model -f Modelfile
+        ollama cp test-model llm_hub/test-model:debug
         
-        # Tag with username
-        FINAL_NAME="${OLLAMA_USERNAME}/test-model:test"
-        echo "Tagging model as: $FINAL_NAME"
-        ollama cp test-model "$FINAL_NAME"
-        
-        # Try to push
-        echo "Pushing model to Ollama Hub..."
-        ollama push "$FINAL_NAME"
+        echo "Pushing with debug..."
+        OLLAMA_DEBUG=1 ollama push llm_hub/test-model:debug
 
+    - name: Debug on failure
+      if: failure()
+      run: |
+        echo "Debug information:"
+        ps aux | grep ollama
+        netstat -tulpn | grep LISTEN
+        cat ~/.ollama/logs/ollama.log || true
+        
     - name: Clean up
       if: always()
       run: |
