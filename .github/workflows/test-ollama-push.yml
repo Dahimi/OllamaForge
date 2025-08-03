@@ -16,54 +16,84 @@ jobs:
   test-push:
     runs-on: ubuntu-latest
     steps:
+    - name: Set up SSH for Ollama
+      run: |
+        # Create .ollama directory with correct permissions
+        mkdir -p ~/.ollama
+        chmod 700 ~/.ollama
+        
+        # Write both private and public keys
+        echo "${{ secrets.OLLAMA_SSH_PRIVATE_KEY }}" > ~/.ollama/id_ed25519
+        echo "${{ secrets.OLLAMA_SSH_PUBLIC_KEY }}" > ~/.ollama/id_ed25519.pub
+        
+        # Set correct permissions
+        chmod 600 ~/.ollama/id_ed25519
+        chmod 644 ~/.ollama/id_ed25519.pub
+        
+        # Debug: Verify keys
+        echo "Private key format check:"
+        if grep -q "BEGIN OPENSSH PRIVATE KEY" ~/.ollama/id_ed25519; then
+          echo "Private key format looks correct"
+        else
+          echo "Warning: Private key might not be in the correct format"
+        fi
+        
+        echo "Public key from secrets:"
+        cat ~/.ollama/id_ed25519.pub
+
+    - name: Kill existing Ollama processes
+      run: |
+        pkill ollama || true
+        sleep 5
+
     - name: Install Ollama
       run: |
         curl -fsSL https://ollama.com/install.sh | sh
         
     - name: Start Ollama server
       run: |
+        if lsof -i:11434; then
+          echo "Port 11434 is still in use"
+          exit 1
+        fi
+        
         ollama serve &
-        sleep 5  # Wait for server to start
+        sleep 5
+        
+        if ! curl -s http://localhost:11434/api/tags > /dev/null; then
+          echo "Ollama server failed to start"
+          exit 1
+        fi
 
     - name: Create test model
       run: |
-        # Create a minimal test model
         echo "FROM gemma:2b
         PARAMETER temperature 0.7
         SYSTEM You are a test model." > Modelfile
         
         ollama create "${{ github.event.inputs.model_name }}" -f Modelfile
-        
-    - name: Set up SSH for Ollama
-      run: |
-        mkdir -p ~/.ollama
-        echo "${{ secrets.OLLAMA_SSH_PRIVATE_KEY }}" > ~/.ollama/id_ed25519
-        chmod 600 ~/.ollama/id_ed25519
-        
-        # Debug: Check SSH key
-        echo "SSH key fingerprint:"
-        ssh-keygen -lf ~/.ollama/id_ed25519
 
     - name: Push to Ollama Hub
       env:
         OLLAMA_USERNAME: ${{ secrets.OLLAMA_USERNAME }}
       run: |
-        # Debug: Print info (safely)
         echo "Username: $OLLAMA_USERNAME"
         echo "Model name: ${{ github.event.inputs.model_name }}"
         echo "Tags: ${{ github.event.inputs.tags }}"
         
-        # Construct final name with namespace and tags
+        # Test SSH connection
+        echo "Testing SSH connection:"
+        ssh -vT git@ollama.com
+        
         FINAL_NAME="${OLLAMA_USERNAME}/${{ github.event.inputs.model_name }}"
         if [ ! -z "${{ github.event.inputs.tags }}" ]; then
           FINAL_NAME="${FINAL_NAME}:${{ github.event.inputs.tags }}"
         fi
         echo "Final name: $FINAL_NAME"
         
-        # Try to copy and push
-        set -x  # Print commands for debugging
+        set -x
         ollama cp "${{ github.event.inputs.model_name }}" "$FINAL_NAME"
-        ollama push "$FINAL_NAME"
+        OLLAMA_DEBUG=1 ollama push "$FINAL_NAME"
         
     - name: Clean up
       if: always()
