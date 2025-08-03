@@ -21,7 +21,6 @@ class ResponseQualityMetric(BaseModel):
 groq_llm = ChatGroq(model="llama-3.3-70b-versatile")
 llm = groq_llm.with_structured_output(ResponseQualityMetric)
 
-
 def evaluate_response_quality(conversation_history: List[Dict], model_response: str, expected_output: str) -> ResponseQualityMetric:
     """
     Evaluates the quality of the model's response in the context of trauma assessment.
