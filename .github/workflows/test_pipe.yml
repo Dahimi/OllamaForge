@@ -1,112 +1,106 @@
-name: Test Ollama Hub Push
+name: Debug Ollama Push
 
 on:
   workflow_dispatch:
-    inputs:
-      model_name:
-        description: 'Test model name (without namespace)'
-        required: true
-        default: 'test-model'
-      tags:
-        description: 'Tags to add (comma-separated)'
-        required: false
-        default: 'test'
 
 jobs:
-  test-push:
+  debug-push:
     runs-on: ubuntu-latest
-    steps:
-    - name: Set up SSH for Ollama
-      run: |
-        # Create .ollama directory with correct permissions
-        mkdir -p ~/.ollama
-        chmod 700 ~/.ollama
-        
-        # Write both private and public keys
-        echo "${{ secrets.OLLAMA_SSH_PRIVATE_KEY }}" > ~/.ollama/id_ed25519
-        echo "${{ secrets.OLLAMA_SSH_PUBLIC_KEY }}" > ~/.ollama/id_ed25519.pub
-        
-        # Set correct permissions
-        chmod 600 ~/.ollama/id_ed25519
-        chmod 644 ~/.ollama/id_ed25519.pub
-        
-        # Debug: Verify keys
-        echo "Private key format check:"
-        if grep -q "BEGIN OPENSSH PRIVATE KEY" ~/.ollama/id_ed25519; then
-          echo "Private key format looks correct"
-        else
-          echo "Warning: Private key might not be in the correct format"
-        fi
-        
-        echo "Public key from secrets:"
-        cat ~/.ollama/id_ed25519.pub
+    container:
+      image: mcr.microsoft.com/devcontainers/base:ubuntu
+      options: --user vscode
 
-    - name: Kill existing Ollama processes
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Ollama environment
       run: |
-        pkill ollama || true
-        sleep 5
+        # Create Ollama directories with correct permissions
+        sudo mkdir -p /home/vscode/.ollama
+        sudo chown -R vscode:vscode /home/vscode/.ollama
+        
+        # Set up SSH keys
+        echo "${{ secrets.OLLAMA_SSH_PRIVATE_KEY }}" > /home/vscode/.ollama/id_ed25519
+        echo "${{ secrets.OLLAMA_SSH_PUBLIC_KEY }}" > /home/vscode/.ollama/id_ed25519.pub
+        chmod 600 /home/vscode/.ollama/id_ed25519
+        chmod 644 /home/vscode/.ollama/id_ed25519.pub
+        
+        echo "Ollama directory setup:"
+        ls -la /home/vscode/.ollama/
 
     - name: Install Ollama
-      run: |
-        curl -fsSL https://ollama.com/install.sh | sh
-        
+      run: curl -fsSL https://ollama.com/install.sh | sh
+
     - name: Start Ollama server
       run: |
-        if lsof -i:11434; then
-          echo "Port 11434 is still in use"
-          exit 1
-        fi
+        # Kill any existing Ollama processes
+        pkill ollama || true
+        sleep 2
         
-        ollama serve &
+        # Start server with debug
+        OLLAMA_DEBUG=1 ollama serve &
         sleep 5
         
-        if ! curl -s http://localhost:11434/api/tags > /dev/null; then
-          echo "Ollama server failed to start"
-          exit 1
-        fi
+        # Verify server
+        curl -v http://localhost:11434/api/tags
 
-    - name: Create test model
-      run: |
-        echo "FROM gemma:2b
-        PARAMETER temperature 0.7
-        SYSTEM You are a test model." > Modelfile
-        
-        ollama create "${{ github.event.inputs.model_name }}" -f Modelfile
-
-    - name: Push to Ollama Hub
+    - name: Create and push test model
       env:
-        OLLAMA_USERNAME: ${{ secrets.OLLAMA_USERNAME }}
-        OLLAMA_HOST: registry.ollama.com  # Add this line
+        OLLAMA_DEBUG: 1
       run: |
-        # Set up SSH config for registry
-        mkdir -p ~/.ssh
-        cat > ~/.ssh/config << EOF
-        Host registry.ollama.com
-          IdentityFile ~/.ollama/id_ed25519
-          StrictHostKeyChecking no
+        # Create minimal model
+        cat > Modelfile << 'EOF'
+        FROM gemma:2b
+        PARAMETER temperature 0.7
         EOF
-        chmod 600 ~/.ssh/config
         
-        # Test connection to registry
-        echo "Testing SSH connection to registry:"
-        ssh -vT git@registry.ollama.com
+        # Create local model
+        echo "Creating model..."
+        ollama create test-debug -f Modelfile
         
-        echo "Username: $OLLAMA_USERNAME"
-        echo "Model name: ${{ github.event.inputs.model_name }}"
-        echo "Tags: ${{ github.event.inputs.tags }}"
+        # Copy with namespace
+        echo "Copying model with namespace..."
+        ollama cp test-debug llm_hub/test-debug
         
-        FINAL_NAME="${OLLAMA_USERNAME}/${{ github.event.inputs.model_name }}"
-        if [ ! -z "${{ github.event.inputs.tags }}" ]; then
-          FINAL_NAME="${FINAL_NAME}:${{ github.event.inputs.tags }}"
-        fi
-        echo "Final name: $FINAL_NAME"
+        # List models to verify
+        echo "Listing models:"
+        ollama list
         
-        set -x
-        ollama cp "${{ github.event.inputs.model_name }}" "$FINAL_NAME"
-        OLLAMA_DEBUG=1 ollama push "$FINAL_NAME"
+        # Push using the namespaced name
+        echo "Pushing model..."
+        OLLAMA_DEBUG=1 ollama push llm_hub/test-debug
         
+        echo "Model should be available at: https://ollama.com/llm_hub/test-debug"
+        
+    - name: Debug info on failure
+      if: failure()
+      run: |
+        echo "Environment:"
+        env | grep -i ollama || true
+        whoami
+        pwd
+        
+        echo "\nOllama directory:"
+        ls -la /home/vscode/.ollama/
+        
+        echo "\nOllama logs:"
+        cat /home/vscode/.ollama/logs/ollama.log || true
+        
+        echo "\nProcess status:"
+        ps aux | grep ollama
+        
+        echo "\nModel files:"
+        ls -R /home/vscode/.ollama/models/ || true
+        
+        echo "\nNetwork connections:"
+        sudo netstat -tupn | grep ollama || true
+        
+        echo "\nTesting registry connection:"
+        curl -v https://registry.ollama.com/v1/auth || true
+
     - name: Clean up
       if: always()
       run: |
         pkill ollama || true
-        ollama rm "${{ github.event.inputs.model_name }}" || true 
+        ollama rm test-debug || true
+        ollama rm llm_hub/test-debug || true
