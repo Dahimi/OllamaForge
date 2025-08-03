@@ -34,10 +34,19 @@ jobs:
         PARAMETER temperature 0.7
         EOF
         
-        # Create model with simpler name
+        # Create local model
+        echo "Creating model..."
         ollama create test-debug -f Modelfile
         
-        # Push using the format that works locally
+        # Copy with namespace
+        echo "Copying model with namespace..."
+        ollama cp test-debug llm_hub/test-debug
+        
+        # List models to verify
+        echo "Listing models:"
+        ollama list
+        
+        # Push using the namespaced name
         echo "Pushing model..."
         ollama push llm_hub/test-debug
         
@@ -50,14 +59,15 @@ jobs:
         echo "\nProcess status:"
         ps aux | grep ollama
         
+        echo "\nModel files:"
+        ls -R ~/.ollama/models/ || true
+        
         echo "\nNetwork connections:"
         netstat -tupn | grep ollama || true
-        
-        echo "\nSSL/TLS debug:"
-        openssl s_client -connect registry.ollama.com:443 -debug || true
 
     - name: Clean up
       if: always()
       run: |
         pkill ollama || true
         ollama rm test-debug || true
+        ollama rm llm_hub/test-debug || true
