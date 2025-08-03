@@ -84,11 +84,24 @@ jobs:
       env:
         OLLAMA_USERNAME: ${{ secrets.OLLAMA_USERNAME }}
         OLLAMA_SSH_PRIVATE_KEY: ${{ secrets.OLLAMA_SSH_PRIVATE_KEY }}
+        OLLAMA_SSH_PUBLIC_KEY: ${{ secrets.OLLAMA_SSH_PUBLIC_KEY }}
       run: |
         # Set up SSH for Ollama
         mkdir -p ~/.ollama
+        
+        # Write the keys
         echo "${OLLAMA_SSH_PRIVATE_KEY}" > ~/.ollama/id_ed25519
+        echo "${OLLAMA_SSH_PUBLIC_KEY}" > ~/.ollama/id_ed25519.pub
         chmod 600 ~/.ollama/id_ed25519
+        chmod 644 ~/.ollama/id_ed25519.pub
+        
+        # Verify the key pair matches
+        if ! ssh-keygen -y -f ~/.ollama/id_ed25519 | diff - ~/.ollama/id_ed25519.pub > /dev/null; then
+          echo "Error: SSH key pair does not match"
+          exit 1
+        fi
+        
+        echo "SSH key pair verified successfully"
         
         # Read tags from evaluation
         TAGS=$(cat model_tags.txt || echo "")
