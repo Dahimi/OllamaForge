@@ -1,100 +1,114 @@
-name: Debug Ollama Push
+name: OllamaForge Model Evaluation
 
 on:
-  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'tasks/**'
 
 jobs:
-  debug-push:
+  check-single-task:
     runs-on: ubuntu-latest
+    outputs:
+      task_path: ${{ steps.get-task.outputs.task_path }}
     steps:
-    - name: Set up authentication
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0  # Needed for git diff
+        
+    - name: Get changed task
+      id: get-task
       run: |
-        # Set up Ollama directory
-        mkdir -p ~/.ollama
+        # Get all changed files in tasks/ directory
+        CHANGED_TASKS=$(git diff --name-only origin/${{ github.base_ref }} ${{ github.sha }} | grep '^tasks/' || true)
         
-        # Add SSH keys for namespace authentication
-        cat > ~/.ollama/id_ed25519 << 'EOF'
-        -----BEGIN OPENSSH PRIVATE KEY-----
-        b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtz
-        c2gtZWQyNTUxOQAAACDVKzYLS6x2A3Hr8RfFv2YxNhjWzXpcELALECbocn4MTQAA
-        AIgvWh8bL1ofGwAAAAtzc2gtZWQyNTUxOQAAACDVKzYLS6x2A3Hr8RfFv2YxNhjW
-        zXpcELALECbocn4MTQAAAEC5cwUIbXjLjlzj7md8KidpDNRvFJoPEnHdKZNTLmTu
-        sdUrNgtLrHYDcevxF8W/ZjE2GNbNelwQsAsQJuhyfgxNAAAAAAECAwQF
-        -----END OPENSSH PRIVATE KEY-----
-        EOF
+        # Extract unique task paths (first directory under tasks/)
+        UNIQUE_TASKS=$(echo "$CHANGED_TASKS" | awk -F'/' '{print $2}' | sort -u)
+        TASK_COUNT=$(echo "$UNIQUE_TASKS" | grep -v '^$' | wc -l)
         
-        cat > ~/.ollama/id_ed25519.pub << 'EOF'
-        ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINUrNgtLrHYDcevxF8W/ZjE2GNbNelwQsAsQJuhyfgxN
-        EOF
+        if [ "$TASK_COUNT" -eq 0 ]; then
+          echo "No task changes detected"
+          exit 1
+        elif [ "$TASK_COUNT" -gt 1 ]; then
+          echo "Error: Changes detected in multiple tasks. Please submit separate PRs for each task."
+          echo "Changed tasks:"
+          echo "$UNIQUE_TASKS"
+          exit 1
+        fi
         
-        chmod 600 ~/.ollama/id_ed25519
-        chmod 644 ~/.ollama/id_ed25519.pub
-        
-        # Add SSH config for registry authentication
-        mkdir -p ~/.ssh
-        cat > ~/.ssh/config << 'EOF'
-        Host registry.ollama.com registry.ollama.ai
-          IdentityFile ~/.ollama/id_ed25519
-          StrictHostKeyChecking no
-        EOF
-        chmod 600 ~/.ssh/config
+        TASK_PATH="tasks/$UNIQUE_TASKS"
+        echo "task_path=$TASK_PATH" >> $GITHUB_OUTPUT
+        echo "Detected task: $TASK_PATH"
 
+  evaluate:
+    needs: check-single-task
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/devcontainers/base:ubuntu
+      options: --user vscode
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements/requirements.txt
+        pip install psutil ollama
+
+    - name: Set up Ollama environment
+      run: |
+        # Create Ollama directories with correct permissions
+        sudo mkdir -p /home/vscode/.ollama
+        sudo chown -R vscode:vscode /home/vscode/.ollama
+        
+        # Set up SSH keys
+        echo "${{ secrets.OLLAMA_SSH_PRIVATE_KEY }}" > /home/vscode/.ollama/id_ed25519
+        echo "${{ secrets.OLLAMA_SSH_PUBLIC_KEY }}" > /home/vscode/.ollama/id_ed25519.pub
+        chmod 600 /home/vscode/.ollama/id_ed25519
+        chmod 644 /home/vscode/.ollama/id_ed25519.pub
+        
     - name: Install Ollama
-      run: |
-        curl -fsSL https://ollama.com/install.sh | sh
-
+      run: curl -fsSL https://ollama.com/install.sh | sh
+        
     - name: Start Ollama server
       run: |
-        pkill ollama || true
-        sleep 2
-        OLLAMA_DEBUG=1 ollama serve &
-        sleep 5
-
-    - name: Verify authentication
-      run: |
-        echo "SSH key fingerprint:"
-        ssh-keygen -l -f ~/.ollama/id_ed25519.pub
+        ollama serve &
+        sleep 5  # Wait for server to start
         
-        echo "\nTesting registry connection:"
-        curl -v https://registry.ollama.com/v1/auth || true
-
-    - name: Create and push test model
+    - name: Create model from PR
+      run: |
+        MODEL_NAME="${{ needs.check-single-task.outputs.task_path }}-pr-${{ github.event.pull_request.number }}"
+        MODEL_NAME=${MODEL_NAME//\//-}  # Replace / with - in model name
+        ollama create $MODEL_NAME -f ${{ needs.check-single-task.outputs.task_path }}/model/Modelfile
+        echo "MODEL_NAME=$MODEL_NAME" >> $GITHUB_ENV
+        
+    - name: Run evaluation
       env:
-        OLLAMA_DEBUG: 1
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       run: |
-        # Create model
-        cat > Modelfile << 'EOF'
-        FROM gemma:2b
-        PARAMETER temperature 0.7
-        EOF
-        
-        # Create and tag with namespace
-        echo "Creating model..."
-        ollama create test-debug -f Modelfile
-        echo "Copying with namespace..."
-        ollama cp test-debug llm_hub/test-debug
-        
-        echo "Current models:"
-        ollama list
-        
-        echo "Pushing model..."
-        OLLAMA_HOST=https://registry.ollama.com ollama push llm_hub/test-debug
+        python scripts/evaluate_task.py "${{ needs.check-single-task.outputs.task_path }}" "$MODEL_NAME"
 
-    - name: Debug on failure
-      if: failure()
+    - name: Push to Ollama Hub
+      if: success()
       run: |
-        echo "Ollama logs:"
-        cat ~/.ollama/logs/ollama.log || true
+        # Copy with namespace
+        echo "Copying model with namespace..."
+        ollama cp "$MODEL_NAME" "llm_hub/$MODEL_NAME"
         
-        echo "\nSSH agent info:"
-        ssh-add -l || true
+        # Push to hub
+        echo "Pushing to Ollama Hub..."
+        OLLAMA_DEBUG=1 ollama push "llm_hub/$MODEL_NAME"
         
-        echo "\nRegistry auth test:"
-        curl -v -H "Authorization: Bearer $(cat ~/.ollama/id_ed25519 | base64)" \
-          https://registry.ollama.com/v1/auth || true
-
+        echo "Model is available at: https://ollama.com/llm_hub/$MODEL_NAME"
+        
     - name: Clean up
       if: always()
       run: |
         pkill ollama || true
-        ollama rm test-debug llm_hub/test-debug || true
+        ollama rm "$MODEL_NAME" || true
+        ollama rm "llm_hub/$MODEL_NAME" || true
