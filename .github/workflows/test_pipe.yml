@@ -7,17 +7,23 @@ jobs:
   debug-push:
     runs-on: ubuntu-latest
     steps:
-    - name: Kill existing Ollama processes
+    - name: Network debugging
       run: |
-        if lsof -i:11434; then
-          echo "Port 11434 is in use. Killing processes..."
-          sudo lsof -i:11434 -t | xargs kill -9 || true
-        fi
-        sleep 2
+        echo "DNS Resolution:"
+        nslookup registry.ollama.com
+        
+        echo "\nPinging registry:"
+        ping -c 4 registry.ollama.com || true
+        
+        echo "\nTraceroute to registry:"
+        traceroute registry.ollama.com || true
+        
+        echo "\nCurl test (HTTP):"
+        curl -v https://ollama.com || true
 
-    - name: Set up SSH
+    - name: Set up SSH with alternative ports
       run: |
-        # Create SSH config
+        # Create SSH config with multiple port attempts
         mkdir -p ~/.ssh
         cat > ~/.ssh/config << 'EOF'
         Host registry.ollama.com
@@ -25,6 +31,10 @@ jobs:
           User git
           IdentityFile ~/.ollama/id_ed25519
           StrictHostKeyChecking no
+          Port 22
+          # Try alternative ports
+          Port 443
+          Port 2222
         EOF
         chmod 600 ~/.ssh/config
         
@@ -46,27 +56,35 @@ jobs:
         
         chmod 600 ~/.ollama/id_ed25519
         chmod 644 ~/.ollama/id_ed25519.pub
+
+    - name: Test SSH connections
+      run: |
+        echo "Testing SSH connection on different ports:"
+        for port in 22 443 2222; do
+          echo "\nTrying port $port:"
+          ssh -vv -p $port registry.ollama.com -o ConnectTimeout=10 || true
+        done
         
-        echo "SSH and key setup complete. Verifying:"
-        ls -la ~/.ollama/
-        ls -la ~/.ssh/
+        echo "\nTesting direct TCP connections:"
+        for port in 22 443 2222; do
+          echo "\nTrying netcat on port $port:"
+          nc -zv registry.ollama.com $port -w 5 || true
+        done
+
+    - name: Check Ollama documentation
+      run: |
+        echo "Fetching latest Ollama docs for registry info:"
+        curl -s https://ollama.com/api || true
         
-        echo "Testing SSH connection to registry:"
-        ssh -vv registry.ollama.com
+        echo "\nChecking if registry.ollama.com resolves to alternative domains:"
+        host registry.ollama.com || true
+        dig registry.ollama.com || true
 
     - name: Install Ollama
       run: |
         curl -fsSL https://ollama.com/install.sh | sh
         
-    - name: Start Ollama server
-      run: |
-        ollama serve &
-        sleep 5
-        
-        # Verify server is running
-        curl -v http://localhost:11434/api/tags
-
-    - name: Create and push test model
+    - name: Try alternative push method
       run: |
         # Create a minimal model
         cat > Modelfile << 'EOF'
@@ -74,26 +92,22 @@ jobs:
         PARAMETER temperature 0.7
         EOF
         
-        # Pull base model
-        ollama pull gemma:2b
+        # Try direct HTTPS push if available
+        echo "Checking for HTTPS push endpoint:"
+        curl -v https://registry.ollama.com/v1/models || true
         
-        # Create and push
+        # Create and attempt push with debug
         ollama create test-model -f Modelfile
-        ollama cp test-model llm_hub/test-model:debug
-        
-        echo "Pushing with debug..."
-        OLLAMA_DEBUG=1 ollama push llm_hub/test-model:debug
+        OLLAMA_DEBUG=1 OLLAMA_HOST=https://registry.ollama.com ollama push soufianedahimi/test-model:debug
 
-    - name: Debug on failure
-      if: failure()
-      run: |
-        echo "Debug information:"
-        ps aux | grep ollama
-        netstat -tulpn | grep LISTEN
-        cat ~/.ollama/logs/ollama.log || true
-        
-    - name: Clean up
+    - name: Debug info
       if: always()
       run: |
-        pkill ollama || true
-        ollama rm test-model || true
+        echo "System info:"
+        uname -a
+        echo "\nNetwork interfaces:"
+        ip addr
+        echo "\nRouting table:"
+        netstat -rn
+        echo "\nFirewall rules:"
+        sudo iptables -L || true
