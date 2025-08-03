@@ -4,6 +4,12 @@ on:
   pull_request:
     paths:
       - 'tasks/**'
+  workflow_dispatch:
+    inputs:
+      skip_evaluation:
+        description: 'Skip evaluation (for testing)'
+        type: boolean
+        default: false
 
 jobs:
   check-single-task:
@@ -42,6 +48,7 @@ jobs:
   evaluate:
     needs: check-single-task
     runs-on: ubuntu-latest
+    if: ${{ !inputs.skip_evaluation }}
     
     steps:
     - uses: actions/checkout@v3
@@ -81,32 +88,69 @@ jobs:
 
     - name: Determine tags
       id: tags
-      if: success()
       run: |
         METRICS_FILE="${{ needs.check-single-task.outputs.task_path }}/evaluation/latest_metrics.json"
         TAGGED_NAME=$(python scripts/determine_tags.py "$METRICS_FILE")
         echo "tagged_name=$TAGGED_NAME" >> $GITHUB_OUTPUT
         echo "Model will be tagged as: $TAGGED_NAME"
 
+  push-to-hub:
+    needs: [check-single-task, evaluate]
+    if: ${{ always() && (needs.evaluate.result == 'success' || inputs.skip_evaluation) }}
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install Ollama
+      run: |
+        curl -fsSL https://ollama.com/install.sh | sh
+        
+    - name: Start Ollama server
+      run: |
+        ollama serve &
+        sleep 5  # Wait for server to start
+
+    - name: Create model
+      run: |
+        MODEL_NAME="${{ needs.check-single-task.outputs.task_path }}-pr-${{ github.event.pull_request.number }}"
+        MODEL_NAME=${MODEL_NAME//\//-}  # Replace / with - in model name
+        ollama create $MODEL_NAME -f ${{ needs.check-single-task.outputs.task_path }}/model/Modelfile
+        echo "MODEL_NAME=$MODEL_NAME" >> $GITHUB_ENV
+
     - name: Set up SSH for Ollama
-      if: success()
       run: |
         mkdir -p ~/.ollama
         echo "${{ secrets.OLLAMA_SSH_PRIVATE_KEY }}" > ~/.ollama/id_ed25519
         chmod 600 ~/.ollama/id_ed25519
+        
+        # Debug: Check SSH key
+        echo "SSH key fingerprint:"
+        ssh-keygen -lf ~/.ollama/id_ed25519
 
     - name: Push to Ollama Hub
-      if: success()
       env:
         OLLAMA_USERNAME: ${{ secrets.OLLAMA_USERNAME }}
       run: |
-        # Tag the model with username and determined tags
-        FINAL_NAME="${OLLAMA_USERNAME}/${{ steps.tags.outputs.tagged_name }}"
-        echo "Tagging model as: $FINAL_NAME"
-        ollama cp "$MODEL_NAME" "$FINAL_NAME"
+        # For testing, use a simple tag if evaluation was skipped
+        if [[ "${{ inputs.skip_evaluation }}" == "true" ]]; then
+          TAGGED_NAME="$MODEL_NAME:test"
+        else
+          TAGGED_NAME="${{ needs.evaluate.outputs.tagged_name }}"
+        fi
         
-        # Push to Ollama Hub
-        echo "Pushing model to Ollama Hub..."
+        # Debug: Print info (safely)
+        echo "Username: $OLLAMA_USERNAME"
+        echo "Model name: $MODEL_NAME"
+        echo "Tagged name: $TAGGED_NAME"
+        
+        # Construct final name with namespace
+        FINAL_NAME="${OLLAMA_USERNAME}/${TAGGED_NAME}"
+        echo "Final name: $FINAL_NAME"
+        
+        # Try to copy and push
+        set -x  # Print commands for debugging
+        ollama cp "$MODEL_NAME" "$FINAL_NAME"
         ollama push "$FINAL_NAME"
         
     - name: Clean up

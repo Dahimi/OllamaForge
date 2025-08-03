@@ -1,0 +1,72 @@
+name: Test Ollama Hub Push
+
+on:
+  workflow_dispatch:
+    inputs:
+      model_name:
+        description: 'Test model name (without namespace)'
+        required: true
+        default: 'test-model'
+      tags:
+        description: 'Tags to add (comma-separated)'
+        required: false
+        default: 'test'
+
+jobs:
+  test-push:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install Ollama
+      run: |
+        curl -fsSL https://ollama.com/install.sh | sh
+        
+    - name: Start Ollama server
+      run: |
+        ollama serve &
+        sleep 5  # Wait for server to start
+
+    - name: Create test model
+      run: |
+        # Create a minimal test model
+        echo "FROM gemma:2b
+        PARAMETER temperature 0.7
+        SYSTEM You are a test model." > Modelfile
+        
+        ollama create "${{ github.event.inputs.model_name }}" -f Modelfile
+        
+    - name: Set up SSH for Ollama
+      run: |
+        mkdir -p ~/.ollama
+        echo "${{ secrets.OLLAMA_SSH_PRIVATE_KEY }}" > ~/.ollama/id_ed25519
+        chmod 600 ~/.ollama/id_ed25519
+        
+        # Debug: Check SSH key
+        echo "SSH key fingerprint:"
+        ssh-keygen -lf ~/.ollama/id_ed25519
+
+    - name: Push to Ollama Hub
+      env:
+        OLLAMA_USERNAME: ${{ secrets.OLLAMA_USERNAME }}
+      run: |
+        # Debug: Print info (safely)
+        echo "Username: $OLLAMA_USERNAME"
+        echo "Model name: ${{ github.event.inputs.model_name }}"
+        echo "Tags: ${{ github.event.inputs.tags }}"
+        
+        # Construct final name with namespace and tags
+        FINAL_NAME="${OLLAMA_USERNAME}/${{ github.event.inputs.model_name }}"
+        if [ ! -z "${{ github.event.inputs.tags }}" ]; then
+          FINAL_NAME="${FINAL_NAME}:${{ github.event.inputs.tags }}"
+        fi
+        echo "Final name: $FINAL_NAME"
+        
+        # Try to copy and push
+        set -x  # Print commands for debugging
+        ollama cp "${{ github.event.inputs.model_name }}" "$FINAL_NAME"
+        ollama push "$FINAL_NAME"
+        
+    - name: Clean up
+      if: always()
+      run: |
+        pkill ollama || true
+        ollama rm "${{ github.event.inputs.model_name }}" || true 
