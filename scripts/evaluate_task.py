@@ -115,6 +115,29 @@ def print_results(metrics: Tuple[float, float, float, dict]):
     print(f"Quantization: {memory_stats['details']['quantization']}")
 
 
+def save_metrics(metrics: Tuple[float, float, float, dict], task_path: str, model_name: str) -> str:
+    """Save metrics to a JSON file and return the file path."""
+    avg_quality, avg_ttft, avg_token_latency, memory_stats = metrics
+    
+    metrics_data = {
+        "task_path": task_path,
+        "model_name": model_name,
+        "quality_score": avg_quality,
+        "ttft": avg_ttft,
+        "token_latency": avg_token_latency,
+        "memory_stats": memory_stats
+    }
+    
+    # Save to a file in the task's evaluation directory
+    metrics_file = Path(task_path) / "evaluation" / "latest_metrics.json"
+    metrics_file.parent.mkdir(parents=True, exist_ok=True)
+    
+    with open(metrics_file, 'w') as f:
+        json.dump(metrics_data, f, indent=2)
+    
+    return str(metrics_file)
+
+
 def main():
     if len(sys.argv) != 3:
         print("Usage: evaluate_task.py <task_path> <model_name>")
@@ -126,7 +149,13 @@ def main():
     try:
         print(f"Evaluating {model_name} on {task_path}")
         metrics = evaluate_task(task_path, model_name)
+        
+        # Print human-readable results
         print_results(metrics)
+        
+        # Save metrics to file
+        metrics_file = save_metrics(metrics, task_path, model_name)
+        print(f"\nMetrics saved to: {metrics_file}")
         
         # Exit based on quality threshold
         QUALITY_THRESHOLD = 0.8
