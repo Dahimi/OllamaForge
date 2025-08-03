@@ -76,14 +76,24 @@ jobs:
     - name: Push to Ollama Hub
       env:
         OLLAMA_USERNAME: ${{ secrets.OLLAMA_USERNAME }}
+        OLLAMA_HOST: registry.ollama.com  # Add this line
       run: |
+        # Set up SSH config for registry
+        mkdir -p ~/.ssh
+        cat > ~/.ssh/config << EOF
+        Host registry.ollama.com
+          IdentityFile ~/.ollama/id_ed25519
+          StrictHostKeyChecking no
+        EOF
+        chmod 600 ~/.ssh/config
+        
+        # Test connection to registry
+        echo "Testing SSH connection to registry:"
+        ssh -vT git@registry.ollama.com
+        
         echo "Username: $OLLAMA_USERNAME"
         echo "Model name: ${{ github.event.inputs.model_name }}"
         echo "Tags: ${{ github.event.inputs.tags }}"
-        
-        # Test SSH connection
-        echo "Testing SSH connection:"
-        ssh -vT git@ollama.com
         
         FINAL_NAME="${OLLAMA_USERNAME}/${{ github.event.inputs.model_name }}"
         if [ ! -z "${{ github.event.inputs.tags }}" ]; then
