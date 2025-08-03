@@ -17,7 +17,7 @@ class ResponseQualityMetric(BaseModel):
         description="Any critical issues or concerns flagged during evaluation",
         default_factory=list
     )
-
+ 
 groq_llm = ChatGroq(model="llama-3.3-70b-versatile")
 llm = groq_llm.with_structured_output(ResponseQualityMetric)
 
