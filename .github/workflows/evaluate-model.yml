@@ -74,16 +74,124 @@ jobs:
         echo "MODEL_NAME=$MODEL_NAME" >> $GITHUB_ENV
         
     - name: Run evaluation
+      id: evaluate
       env:
         GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       run: |
-        python scripts/evaluate_task.py "${{ needs.check-single-task.outputs.task_path }}" "$MODEL_NAME"
+        # Run evaluation and capture metrics
+        python scripts/evaluate_task.py "${{ needs.check-single-task.outputs.task_path }}" "$MODEL_NAME" > evaluation_results.txt
+        
+        # Extract metrics
+        QUALITY_SCORE=$(grep "Average Quality Score:" evaluation_results.txt | awk '{print $4}')
+        TTFT=$(grep "Average Time to First Token:" evaluation_results.txt | awk '{print $6}' | sed 's/s//')
+        MEMORY=$(grep "Average Memory Usage:" evaluation_results.txt | awk '{print $4}' | sed 's/MB//')
+        
+        # Set outputs for next steps
+        echo "quality=$QUALITY_SCORE" >> $GITHUB_OUTPUT
+        echo "ttft=$TTFT" >> $GITHUB_OUTPUT
+        echo "memory=$MEMORY" >> $GITHUB_OUTPUT
+        
+        # Check if meets quality threshold
+        if (( $(echo "$QUALITY_SCORE >= 0.8" | bc -l) )); then
+          echo "passed=true" >> $GITHUB_OUTPUT
+        else
+          echo "passed=false" >> $GITHUB_OUTPUT
+        fi
 
-    - name: Push to Ollama Hub
-      if: success()
+    - name: Set up SSH for Ollama
+      if: steps.evaluate.outputs.passed == 'true'
       run: |
-        # TODO: Add Ollama Hub push logic here
-        echo "Model $MODEL_NAME would be pushed to Ollama Hub"
+        mkdir -p ~/.ollama
+        echo "${{ secrets.OLLAMA_SSH_PRIVATE_KEY }}" > ~/.ollama/id_ed25519
+        chmod 600 ~/.ollama/id_ed25519
+
+    - name: Tag and push model
+      if: steps.evaluate.outputs.passed == 'true'
+      run: |
+        # Get task name without 'tasks/' prefix
+        TASK_NAME=$(echo "${{ needs.check-single-task.outputs.task_path }}" | sed 's/tasks\///')
+        BASE_NAME="${{ secrets.OLLAMA_USERNAME }}/$TASK_NAME"
+        
+        # Determine tags based on performance
+        TAGS=()
+        
+        # Always tag with version from PR
+        TAGS+=("$BASE_NAME:pr${{ github.event.pull_request.number }}")
+        
+        # Check if it's the best quality score so far
+        if [[ -f "${{ needs.check-single-task.outputs.task_path }}/best_scores.json" ]]; then
+          BEST_QUALITY=$(jq '.quality' "${{ needs.check-single-task.outputs.task_path }}/best_scores.json")
+          if (( $(echo "${{ steps.evaluate.outputs.quality }} > $BEST_QUALITY" | bc -l) )); then
+            TAGS+=("$BASE_NAME:best-quality")
+          fi
+        else
+          TAGS+=("$BASE_NAME:best-quality")
+        fi
+        
+        # Check if it's the fastest (lowest TTFT)
+        if [[ -f "${{ needs.check-single-task.outputs.task_path }}/best_scores.json" ]]; then
+          BEST_TTFT=$(jq '.ttft' "${{ needs.check-single-task.outputs.task_path }}/best_scores.json")
+          if (( $(echo "${{ steps.evaluate.outputs.ttft }} < $BEST_TTFT" | bc -l) )); then
+            TAGS+=("$BASE_NAME:fastest")
+          fi
+        else
+          TAGS+=("$BASE_NAME:fastest")
+        fi
+        
+        # Check if it's the most memory efficient
+        if [[ -f "${{ needs.check-single-task.outputs.task_path }}/best_scores.json" ]]; then
+          BEST_MEMORY=$(jq '.memory' "${{ needs.check-single-task.outputs.task_path }}/best_scores.json")
+          if (( $(echo "${{ steps.evaluate.outputs.memory }} < $BEST_MEMORY" | bc -l) )); then
+            TAGS+=("$BASE_NAME:smallest")
+          fi
+        else
+          TAGS+=("$BASE_NAME:smallest")
+        fi
+        
+        # Push model with all earned tags
+        for TAG in "${TAGS[@]}"; do
+          echo "Pushing model as $TAG"
+          ollama cp "$MODEL_NAME" "$TAG"
+          ollama push "$TAG"
+        done
+        
+        # Update best scores
+        echo "{
+          \"quality\": ${{ steps.evaluate.outputs.quality }},
+          \"ttft\": ${{ steps.evaluate.outputs.ttft }},
+          \"memory\": ${{ steps.evaluate.outputs.memory }}
+        }" > "${{ needs.check-single-task.outputs.task_path }}/best_scores.json"
+        
+        # Create PR comment with results
+        echo "Model evaluation successful! 🎉" > pr_comment.md
+        echo "Metrics:" >> pr_comment.md
+        echo "- Quality Score: ${{ steps.evaluate.outputs.quality }}" >> pr_comment.md
+        echo "- Time to First Token: ${{ steps.evaluate.outputs.ttft }}s" >> pr_comment.md
+        echo "- Memory Usage: ${{ steps.evaluate.outputs.memory }}MB" >> pr_comment.md
+        echo "" >> pr_comment.md
+        echo "Tags earned:" >> pr_comment.md
+        for TAG in "${TAGS[@]}"; do
+          echo "- \`$TAG\`" >> pr_comment.md
+        done
+        echo "" >> pr_comment.md
+        echo "You can pull this model using:" >> pr_comment.md
+        echo "\`\`\`bash" >> pr_comment.md
+        echo "ollama pull ${TAGS[0]}" >> pr_comment.md
+        echo "\`\`\`" >> pr_comment.md
+
+    - name: Comment PR
+      if: steps.evaluate.outputs.passed == 'true'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const comment = fs.readFileSync('pr_comment.md', 'utf8');
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body: comment
+          });
         
     - name: Clean up
       if: always()

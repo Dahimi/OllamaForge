@@ -16,6 +16,8 @@ To submit a specialized LLM, package your work as follows:
 
 ### 2. **Evaluation Pipeline**
 
+![CI&CD Pipeline](./pipeline.png)
+
 Once submitted, your model will enter an evaluation pipeline where it will be tested against task-specific benchmarks. The evaluation process includes:
 
 - **Performance Metrics**:
