@@ -1,114 +1,142 @@
-name: OllamaForge Model Evaluation
+name: Debug Ollama Push
 
 on:
-  pull_request:
-    paths:
-      - 'tasks/**'
+  workflow_dispatch:
 
 jobs:
-  check-single-task:
-    runs-on: ubuntu-latest
-    outputs:
-      task_path: ${{ steps.get-task.outputs.task_path }}
-    steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0  # Needed for git diff
-        
-    - name: Get changed task
-      id: get-task
-      run: |
-        # Get all changed files in tasks/ directory
-        CHANGED_TASKS=$(git diff --name-only origin/${{ github.base_ref }} ${{ github.sha }} | grep '^tasks/' || true)
-        
-        # Extract unique task paths (first directory under tasks/)
-        UNIQUE_TASKS=$(echo "$CHANGED_TASKS" | awk -F'/' '{print $2}' | sort -u)
-        TASK_COUNT=$(echo "$UNIQUE_TASKS" | grep -v '^$' | wc -l)
-        
-        if [ "$TASK_COUNT" -eq 0 ]; then
-          echo "No task changes detected"
-          exit 1
-        elif [ "$TASK_COUNT" -gt 1 ]; then
-          echo "Error: Changes detected in multiple tasks. Please submit separate PRs for each task."
-          echo "Changed tasks:"
-          echo "$UNIQUE_TASKS"
-          exit 1
-        fi
-        
-        TASK_PATH="tasks/$UNIQUE_TASKS"
-        echo "task_path=$TASK_PATH" >> $GITHUB_OUTPUT
-        echo "Detected task: $TASK_PATH"
-
-  evaluate:
-    needs: check-single-task
+  debug-push:
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/devcontainers/base:ubuntu
-      options: --user vscode
-    
+      options: |
+        --user root
+        -v /__w/_temp:/__w/_temp
+        -v /__w/_actions:/__w/_actions
+
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-        
-    - name: Install dependencies
+    - name: Fix workspace permissions
       run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements/requirements.txt
-        pip install psutil ollama
+        mkdir -p /__w/_temp/_runner_file_commands
+        chmod -R 777 /__w/_temp
+        chmod -R 777 /__w/_actions
+        
+    - uses: actions/checkout@v3
+
+    - name: Setup user and permissions
+      run: |
+        # Create vscode user (if it doesn't exist)
+        id -u vscode &>/dev/null || useradd -m -s /bin/bash vscode
+        
+        # Set up Ollama directories with correct permissions
+        mkdir -p /home/vscode/.ollama
+        chown -R vscode:vscode /home/vscode
+        
+        # Set up workspace permissions
+        chown -R vscode:vscode $GITHUB_WORKSPACE
+        
+        echo "Directory permissions:"
+        ls -la /home/vscode
+        ls -la $GITHUB_WORKSPACE
 
     - name: Set up Ollama environment
       run: |
-        # Create Ollama directories with correct permissions
-        sudo mkdir -p /home/vscode/.ollama
-        sudo chown -R vscode:vscode /home/vscode/.ollama
-        
         # Set up SSH keys
         echo "${{ secrets.OLLAMA_SSH_PRIVATE_KEY }}" > /home/vscode/.ollama/id_ed25519
         echo "${{ secrets.OLLAMA_SSH_PUBLIC_KEY }}" > /home/vscode/.ollama/id_ed25519.pub
         chmod 600 /home/vscode/.ollama/id_ed25519
         chmod 644 /home/vscode/.ollama/id_ed25519.pub
+        chown -R vscode:vscode /home/vscode/.ollama
         
+        echo "Ollama directory setup:"
+        ls -la /home/vscode/.ollama/
+
     - name: Install Ollama
       run: curl -fsSL https://ollama.com/install.sh | sh
-        
+
+    - name: Switch to vscode user
+      run: |
+        # Switch to vscode user for remaining steps
+        echo "Setting OLLAMA_HOME..."
+        echo "export OLLAMA_HOME=/home/vscode/.ollama" >> /home/vscode/.bashrc
+        echo "OLLAMA_HOME=/home/vscode/.ollama" >> $GITHUB_ENV
+
     - name: Start Ollama server
       run: |
-        ollama serve &
-        sleep 5  # Wait for server to start
+        # Kill any existing Ollama processes
+        pkill ollama || true
+        sleep 2
         
-    - name: Create model from PR
-      run: |
-        MODEL_NAME="${{ needs.check-single-task.outputs.task_path }}-pr-${{ github.event.pull_request.number }}"
-        MODEL_NAME=${MODEL_NAME//\//-}  # Replace / with - in model name
-        ollama create $MODEL_NAME -f ${{ needs.check-single-task.outputs.task_path }}/model/Modelfile
-        echo "MODEL_NAME=$MODEL_NAME" >> $GITHUB_ENV
+        # Start server with debug
+        sudo -u vscode OLLAMA_HOME=/home/vscode/.ollama OLLAMA_DEBUG=1 ollama serve &
+        sleep 5
         
-    - name: Run evaluation
-      env:
-        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-      run: |
-        python scripts/evaluate_task.py "${{ needs.check-single-task.outputs.task_path }}" "$MODEL_NAME"
+        # Verify server
+        curl -v http://localhost:11434/api/tags
 
-    - name: Push to Ollama Hub
-      if: success()
+    - name: Create and push test model
       run: |
+        # Run as vscode user
+        sudo -u vscode bash << 'EOF'
+        export OLLAMA_HOME=/home/vscode/.ollama
+        export OLLAMA_DEBUG=1
+        
+        # Create minimal model
+        cat > Modelfile << 'MODELEOF'
+        FROM gemma:2b
+        PARAMETER temperature 0.7
+        MODELEOF
+        
+        # Create local model
+        echo "Creating model..."
+        ollama create test-debug -f Modelfile
+        
         # Copy with namespace
         echo "Copying model with namespace..."
-        ollama cp "$MODEL_NAME" "llm_hub/$MODEL_NAME"
+        ollama cp test-debug llm_hub/test-debug
         
-        # Push to hub
-        echo "Pushing to Ollama Hub..."
-        OLLAMA_DEBUG=1 ollama push "llm_hub/$MODEL_NAME"
+        # List models to verify
+        echo "Listing models:"
+        ollama list
         
-        echo "Model is available at: https://ollama.com/llm_hub/$MODEL_NAME"
+        # Push using the namespaced name
+        echo "Pushing model..."
+        ollama push llm_hub/test-debug
         
+        echo "Model should be available at: https://ollama.com/llm_hub/test-debug"
+        EOF
+        
+    - name: Debug info on failure
+      if: failure()
+      run: |
+        echo "Environment:"
+        env | grep -i ollama || true
+        id
+        pwd
+        
+        echo "\nOllama directory:"
+        ls -la /home/vscode/.ollama/
+        
+        echo "\nOllama logs:"
+        cat /home/vscode/.ollama/logs/ollama.log || true
+        
+        echo "\nProcess status:"
+        ps aux | grep ollama
+        
+        echo "\nModel files:"
+        ls -R /home/vscode/.ollama/models/ || true
+        
+        echo "\nNetwork connections:"
+        netstat -tupn | grep ollama || true
+        
+        echo "\nTesting registry connection:"
+        curl -v https://registry.ollama.com/v1/auth || true
+        
+        echo "\nWorkspace permissions:"
+        ls -la $GITHUB_WORKSPACE
+
     - name: Clean up
       if: always()
       run: |
         pkill ollama || true
-        ollama rm "$MODEL_NAME" || true
-        ollama rm "llm_hub/$MODEL_NAME" || true
+        ollama rm test-debug || true
+        ollama rm llm_hub/test-debug || true
