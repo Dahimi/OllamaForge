@@ -58,8 +58,8 @@ def get_task_metrics(task_path: str) -> Tuple[object, object]:
     
     # Import quality metrics
     quality_spec = importlib.util.spec_from_file_location(
-        "response_quality",
-        metrics_path / "response_quality.py"
+        "reward_model",
+        metrics_path / "reward_model.py"
     )
     quality_module = importlib.util.module_from_spec(quality_spec)
     quality_spec.loader.exec_module(quality_module)
@@ -96,7 +96,7 @@ def evaluate_task(task_path: str, model_name: str) -> Tuple[float, float, float,
     print(f"Running evaluation for {model_name} on {task_path}")
     
     # Run evaluation for each test case
-    for case in test_cases[:1]:
+    for case in test_cases:
         print(f"Running evaluation for {model_name} on {task_path} for case {case['id']}")
         # Measure performance
         perf_metrics = perf_module.measure_performance(

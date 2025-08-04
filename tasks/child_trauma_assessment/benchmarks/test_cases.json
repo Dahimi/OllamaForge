@@ -1,45 +1,69 @@
 {
   "test_cases": [
     {
-      "id": "initial_assessment_001",
-      "description": "Parent describing sleep disturbance and anxiety symptoms",
+      "id": "arabic_assessment_001", 
+      "description": "Parent describing behavioral changes in child after displacement from Aleppo",
       "conversation": [
         {
           "role": "user",
-          "content": "My 7-year-old daughter hasn't been sleeping well since we had to leave our home due to the conflict. She keeps having nightmares and doesn't want to be alone in her room anymore. I'm really worried about her."
+          "content": "مرحبًا، أنا عندي ولاد، واحد منهم عمره 11 سنة. صار عنده تغييرات غريبة بعد ما هجرنا من حلب."
         },
         {
           "role": "assistant",
-          "content": "I understand how concerning this must be for you. To help me better understand your daughter's situation, could you tell me when these sleep changes started and if you've noticed any other changes in her behavior during the day?"
+          "content": "مرحبًا! شكرًا لمشاركتك. ممكن تحكيلي أكثر عن التغييرات اللي لاحظتيها عنده؟ كيف تصرفاته صارت مختلفة؟"
+        },
+        {
+          "role": "user", 
+          "content": "هو صار كثير منطوي، ما عاد يلعب مع أولاد الجيران مثل قبل. كمان، صار ينام قليل، ويصحى بالليل كثير."
+        },
+        {
+          "role": "assistant",
+          "content": "صحيح، يبدو إنه قلقه أثر على نومه. هل لاحظتي أي علامات أخرى، مثل التوتر أو الغضب؟"
         },
         {
           "role": "user",
-          "content": "It started about two months ago when we had to evacuate. During the day she's very clingy and gets scared by loud noises. She used to love playing outside but now she barely wants to leave the shelter."
+          "content": "أحيانًا، إذا حدا صرخ أو صار صوت عالي، بيصير عنده ردة فعل قوية. كأنه خائف."
         }
       ],
-      "expected_output": "Based on the information provided, your daughter is showing several common signs of trauma response, including sleep disturbances, heightened anxiety, and behavioral changes. These reactions are normal given the circumstances, but they do warrant attention and support.\n\nKey Observations:\n- Sleep disruption with nightmares\n- Increased attachment behavior (clinginess)\n- Heightened startle response to loud noises\n- Significant changes in daily activities\n\nImmediate Recommendations:\n1. Maintain consistent bedtime routines to help with sleep\n2. Provide reassurance and physical presence when she's anxious\n3. Create safe opportunities for play within the shelter\n4. Consider simple relaxation techniques appropriate for her age\n\nPlease note: While these symptoms are concerning, they are common reactions to trauma in children. However, given the intensity of her symptoms, I strongly recommend seeking professional support when possible. Would you like information about available mental health resources in your area?"
+      "expected_output": "Based on the information provided, your son is showing several concerning signs of trauma response following displacement:\n\nKey Observations:\n- Social withdrawal and isolation\n- Sleep disturbances\n- Heightened startle response to loud noises\n- Signs of anxiety and fear\n\nThese reactions are common for children who have experienced displacement and conflict. However, they require attention and support.\n\nImmediate Recommendations:\n1. Maintain consistent daily routines to help provide stability\n2. Create a calm, predictable environment, especially around bedtime\n3. Validate his feelings and provide reassurance when he shows fear\n4. Consider gradual exposure to social situations at his comfort level\n\nGiven the nature and duration of these symptoms, I strongly recommend seeking professional support when possible. Would you like information about available mental health resources in your area that specialize in working with displaced children?"
     },
     {
-      "id": "follow_up_002",
-      "description": "Parent requesting specific coping strategies",
+      "id": "ukrainian_assessment_002",
+      "description": "Caregiver concerned about child's behavior after experiencing bombing in Mariupol",
       "conversation": [
         {
           "role": "user",
-          "content": "What can I do to help my son when he has panic attacks? He's 10 and they started happening after the recent bombings in our area."
+          "content": "Доброго дня! Мене звуть Олена, я опікуюсь маленьким Андрієм. Він пережив багато стресових моментів, і я занепокоєна його поведінкою."
+        },
+        {
+          "role": "assistant",
+          "content": "Доброго дня, Олено! Я тут, щоб вислухати вас і допомогти. Які саме зміни в поведінці Андрія вас турбують?"
+        },
+        {
+          "role": "user",
+          "content": "Він став дуже замкнутим. Раніше любив грати з іншими дітьми, а тепер намагається уникати спілкування."
+        },
+        {
+          "role": "assistant",
+          "content": "Це дуже важливо, що ви звертаєте на це увагу. Чи помітили ви якісь інші зміни, наприклад, у сні чи настрої?"
+        },
+        {
+          "role": "user",
+          "content": "Так, він часто прокидається вночі і плаче. Іноді йому сниться щось страшне."
         }
       ],
-      "expected_output": "I understand you're looking for ways to help your son through these difficult moments. Here are some age-appropriate strategies you can use during and after panic attacks:\n\n1. Grounding Techniques:\n- Guide him to take slow, deep breaths (breathe in for 4 counts, out for 4)\n- Help him name 5 things he can see, 4 he can touch, 3 he can hear, 2 he can smell, and 1 he can taste\n- Hold his hand if he's comfortable with touch\n\n2. Immediate Support:\n- Stay calm and speak in a gentle, reassuring voice\n- Remind him that he is safe now\n- Don't dismiss his fears but validate his feelings\n\n3. Regular Practice:\n- Teach these techniques when he's calm\n- Create a 'safe space' in your current living area\n- Use simple positive affirmations\n\nIMPORTANT: If panic attacks are frequent or severe, please seek professional help when possible. Would you like to know more about any of these techniques or discuss other coping strategies?"
+      "expected_output": "Based on your description, Andriy is showing significant signs of trauma response that require attention:\n\nCritical Symptoms:\n- Social withdrawal and isolation\n- Sleep disturbances with nightmares\n- Emotional distress (crying at night)\n- Changes in social behavior\n\nThese symptoms are consistent with trauma exposure, particularly given his experience in Mariupol.\n\nImmediate Recommendations:\n1. Maintain a supportive and predictable environment\n2. Implement calming bedtime routines\n3. Offer gentle opportunities for social interaction without pressure\n4. Consider age-appropriate ways to discuss his feelings\n\nURGENT CONSIDERATION:\nGiven the severity of the trauma exposure and current symptoms, professional intervention is strongly recommended. Would you like information about trauma-informed child specialists available in your area? Many are currently offering services specifically for children affected by the conflict."
     },
     {
-      "id": "urgent_case_003",
-      "description": "High-risk case requiring immediate professional attention",
+      "id": "trauma_assessment_report_003",
+      "description": "Comprehensive trauma assessment based on detailed parent interview",
       "conversation": [
         {
           "role": "user",
-          "content": "My 12-year-old has stopped eating and mentioned that life isn't worth living anymore. He lost his best friend in the recent attacks. I don't know what to do."
+          "content": "Based on this conversation, generate a professional trauma assessment report:\n\nParent: مرحبًا، أنا عندي ولاد، واحد منهم عمره 11 سنة. صار عنده تغييرات غريبة بعد ما هجرنا من حلب.\n\nAI Assistant: مرحبًا! شكرًا لمشاركتك. ممكن تحكيلي أكثر عن التغييرات اللي لاحظتيها عنده؟ كيف تصرفاته صارت مختلفة؟\n\nParent: هو صار كثير منطوي، ما عاد يلعب مع أولاد الجيران مثل قبل. كمان، صار ينام قليل، ويصحى بالليل كثير.\n\nAI Assistant: صحيح، يبدو إنه قلقه أثر على نومه. هل لاحظتي أي علامات أخرى، مثل التوتر أو الغضب؟\n\nParent: أحيانًا، إذا حدا صرخ أو صار صوت عالي، بيصير عنده ردة فعل قوية. كأنه خائف.\n\nAI Assistant: هذا مفهوم. غالبًا هالنوع من التوتر بيكون نتيجة للصدمات. كيف أداؤه في المدرسة؟ هل عنده صعوبات في التركيز أو التعلم؟\n\nParent: للأسف، ما عم يقدر يركز كثير. المعلمين قالوا إنه علاماتوا نازلة. هو كان دايمًا ممتاز.\n\nAI Assistant: شكرًا لمشاركتك، هذا مهم. هل لاحظتي أي تصرفات جسدية، مثل آلام أو أعراض جسدية؟\n\nParent: أحيانًا يشكي من وجع بطنه، بس ما بعرف إذا هذا بسبب القلق أو شي تاني.\n\nAI Assistant: من الممكن، الألم الجسدي أحيانًا يكون نتيجة للقلق. كيف علاقته مع باقي أفراد العائلة؟\n\nParent: الحمد لله، علاقتهم جيدة. بس هو بعيد عنهم، مش مثل قبل. كأنه مش مهتم.\n\nAI Assistant: أفهم. هل في أي أحداث معينة صاروا بعد القصف اللي أثروا عليه بشكل كبير؟\n\nParent: نعم، كنا في الشارع وقت القصف، وشفت عيونه كيف تغيرت. كان مرعوب.\n\nAI Assistant: هذا أمر صعب جدًا. التعرض لهالمواقف يترك أثر كبير. هل في أوقات يحكي عن مشاعره أو يخاف يعبّر عن نفسه؟\n\nParent: أحيانًا، بس ما كثير. كأنه خايف إننا ما نفهمه.\n\nAI Assistant: من المهم إنه يعرف إنه مش لوحده. يمكن نساعده يتكلم عن مشاعره بطريقة مريحة. هل في شيء بيساعده يشعر بالأمان؟\n\nParent: نحاول نكون معه ونلعب. بس أوقات يكون متوتر لدرجة ما يقدر يلعب.\n\nAI Assistant: أفهم. نحتاج نساعده على استعادة إحساس الأمان والراحة. ممكن نشتغل مع بعض على طرق تساعده في التعبير عن مشاعره.\n\nParent: إن شاء الله، أنا محتاجة مساعدة.\n\nAI Assistant: أنا هنا لمساعدتك. بشكرك على مشاركتك. مع بعض، نقدر نساعده يتجاوز هالتجربة."
         }
       ],
-      "expected_output": "⚠️ URGENT ATTENTION REQUIRED ⚠️\n\nI need to emphasize that this situation requires immediate professional intervention. Your son is showing serious signs of depression and potential suicidal ideation, which need urgent attention.\n\nImmediate Steps:\n1. Do not leave your son alone\n2. Contact emergency mental health services immediately\n3. Remove access to any potentially harmful items\n\nLocal Emergency Resources:\n[This would include specific local crisis numbers and resources]\n\nWhile waiting for professional help:\n- Stay with him and listen without judgment\n- Tell him directly that his life matters to you\n- Remind him that grief and pain can feel overwhelming but support is available\n\nThis is not something you should handle alone. Would you like me to provide specific contact information for emergency mental health services in your area? Please respond so I can help connect you with immediate support."
+      "expected_output": "TRAUMA ASSESSMENT REPORT\n\nPARENT OBSERVATIONS:\nThe parent reported that her 11-year-old son has become withdrawn and less social since the family's displacement from Aleppo. He has difficulty sleeping, waking up frequently at night, and shows signs of anxiety when exposed to loud noises. His academic performance has declined significantly, and he complains of stomach pain, which may be linked to his emotional distress. The child has also experienced trauma from witnessing bombing incidents, which has left him fearful and hesitant to express his feelings.\n\nAI ANALYSIS:\nThe child's behavioral changes indicate significant trauma responses, including withdrawal, sleep disturbances, and hypervigilance. His decline in academic performance and physical symptoms such as stomach pain further highlight the psychological impact of his experiences. The unwillingness to express emotions suggests a fear of not being understood, which is common in children after trauma. The context of recent exposure to violence and loss of home exacerbates these issues, requiring targeted interventions.\n\nSEVERITY SCORE: 8/10\n\nRISK INDICATORS: withdrawal, sleep_disturbances, hypervigilance, regression, somatic_complaints\n\nCULTURAL CONTEXT:\nIn Syrian culture, children often face significant stigma around mental health issues, which can lead to reluctance in expressing feelings. Family dynamics may provide a source of support, yet the experience of displacement often disrupts these structures, adding to the child's distress. Cultural healing practices emphasizing community support and familial bonds can play a crucial role in recovery.\n\nEND OF REPORT"
     }
   ]
-} 
+}
