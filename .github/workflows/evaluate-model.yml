@@ -81,9 +81,56 @@ jobs:
 
     - name: Push to Ollama Hub
       if: success()
+      env:
+        OLLAMA_USERNAME: ${{ secrets.OLLAMA_USERNAME }}
+        OLLAMA_SSH_PRIVATE_KEY: ${{ secrets.OLLAMA_SSH_PRIVATE_KEY }}
+        OLLAMA_SSH_PUBLIC_KEY: ${{ secrets.OLLAMA_SSH_PUBLIC_KEY }}
       run: |
-        # TODO: Add Ollama Hub push logic here
-        echo "Model $MODEL_NAME would be pushed to Ollama Hub"
+        # Set up SSH for Ollama
+        mkdir -p ~/.ollama
+        
+        # Write the keys
+        echo "${OLLAMA_SSH_PRIVATE_KEY}" > ~/.ollama/id_ed25519
+        echo "${OLLAMA_SSH_PUBLIC_KEY}" > ~/.ollama/id_ed25519.pub
+        chmod 600 ~/.ollama/id_ed25519
+        chmod 644 ~/.ollama/id_ed25519.pub
+        
+        # Verify the key pair matches
+        if ! ssh-keygen -y -f ~/.ollama/id_ed25519 | diff - ~/.ollama/id_ed25519.pub > /dev/null; then
+          echo "Error: SSH key pair does not match"
+          exit 1
+        fi
+        
+        echo "SSH key pair verified successfully"
+        
+        # Read tags from evaluation
+        TAGS=$(cat model_tags.txt || echo "")
+        MODEL_NAME="${{ env.MODEL_NAME }}"
+        
+        # Log the push details
+        echo "Pushing model: ${MODEL_NAME}"
+        echo "Available tags: ${TAGS}"
+        
+        # Copy model with username prefix
+        echo "Copying model to ${OLLAMA_USERNAME}/${MODEL_NAME}"
+        ollama cp "${MODEL_NAME}" "${OLLAMA_USERNAME}/${MODEL_NAME}" || echo "Warning: Failed to copy model"
+        
+        # Push base model first
+        echo "Pushing base model ${OLLAMA_USERNAME}/${MODEL_NAME}"
+        ollama push "${OLLAMA_USERNAME}/${MODEL_NAME}" || echo "Warning: Failed to push base model"
+        
+        # Push tagged versions if any tags exist
+        if [ ! -z "${TAGS}" ]; then
+          while IFS= read -r tag; do
+            if [ ! -z "${tag}" ]; then
+              echo "Copying model for tag: ${tag}"
+              ollama cp "${MODEL_NAME}" "${OLLAMA_USERNAME}/${MODEL_NAME}:${tag}" || echo "Warning: Failed to copy model for tag ${tag}"
+              
+              echo "Pushing tagged model: ${OLLAMA_USERNAME}/${MODEL_NAME}:${tag}"
+              ollama push "${OLLAMA_USERNAME}/${MODEL_NAME}:${tag}" || echo "Warning: Failed to push tagged model ${tag}"
+            fi
+          done <<< "${TAGS}"
+        fi
         
     - name: Clean up
       if: always()
