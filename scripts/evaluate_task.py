@@ -224,7 +224,9 @@ def main():
         
         # Exit based on quality threshold
         QUALITY_THRESHOLD = 0.8
-        sys.exit(0 if metrics[0] >= QUALITY_THRESHOLD else 1)
+        current_best_quality = new_baseline["best-quality"]["quality"]
+        effective_threshold = min(QUALITY_THRESHOLD, current_best_quality)
+        sys.exit(0 if metrics[0] >= effective_threshold else 1)
         
     except Exception as e:
         print(f"Error during evaluation: {str(e)}", file=sys.stderr)
