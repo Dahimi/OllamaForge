@@ -88,6 +88,8 @@ Want to dethrone the current champions? Here's how:
 
 **Important**: One task per PR to maintain clean evaluation pipelines.
 
+For detailed contribution guidelines, see [CONTRIBUTING.md](docs/CONTRIBUTING.md).
+
 ### Adding a New Task
 1. Create directory under `tasks/`
 2. Provide:
@@ -96,6 +98,8 @@ Want to dethrone the current champions? Here's how:
    - Evaluation metrics (or use standard ones)
    - Task documentation
 3. Submit PR with comprehensive benchmarks
+
+For complete submission guidelines, check out [docs/guidelines.md](docs/guidelines.md).
 
 ### Improving Existing Tasks
 1. Fork the repository
@@ -137,6 +141,8 @@ When your model claims a championship:
 2. Instant worldwide availability via `ollama pull`
 3. Credit as model creator/contributor
 4. Performance tracking and leaderboard placement
+
+*Note: We're currently fine-tuning our CI/CD pipeline for seamless Ollama Hub integration - manual publishing may be needed temporarily.*
 
 ## **Future Roadmap**
 1. **More Specialized Tasks**: Adding models for:
