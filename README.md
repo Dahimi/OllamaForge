@@ -159,9 +159,6 @@ When your model claims a championship:
    - Usage analytics
    - Collaborative improvement tools
 
-## **Meet Our Team**
-- [Soufiane DAHIMI](https://www.linkedin.com/in/soufiane-dahimi/)
-
 ## **License**
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
